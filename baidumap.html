@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+	<style type="text/css">
+	body, html,#allmap {width: 100%;height: 100%;overflow: hidden;margin:0;font-family:"微软雅黑";}
+	</style>
+	<script type="text/javascript" src="https://api.map.baidu.com/api?type=webgl&v=1.0&ak=bhfegcdfczbj2FDgdsMnThNH47XTXZqx"></script>
+	<title>地图展示</title>
+</head>
+<body>
+	<div id="allmap"></div>
+</body>
+</html>
+<!-- <script src="baiduTilesInfo.js"></script>  -->
+<script src="qwebchannel.js"></script>
+<script type="text/javascript">
+	new QWebChannel(qt.webChannelTransport, function(channel) {
+		//window.bridge_js = channel.objects.bridge_name;  //bridge_name 与QT 中一致
+	 	//window.bridge_js.sigYourName.connect(function(name) {});
+		window.mainWindow_js = channel.objects.mainWindow;  //bridge_name 与QT 中一致
+		window.mainWindow_js.sigYourName.connect(function(name) {});
+		
+   });
+   	var Mode = "navigationMap";
+
+	var continueAdd_lon = true;
+	var continueAdd_name = true;
+
+	var points = [];
+	var polyline;
+	// 百度地图API功能
+	// 全局变量记录插入的jsonp标签
+	window.clickPoint = null;
+	window.script = null;
+	window.sucess = function(res) {		
+		console.log(res);
+		if (res.uii_err === 0 && res.content) {
+			var info = res.content;
+			//var sContent = `<h4 style='margin:0 0 5px 10px;'>${info.name}</h4>
+				//<h5 style='margin:0 0 5px 10px;'>地址：${info.addr}</h4>
+				//<h5 style='margin:0 0 35px 10px;'>分类：${info.tag !== '境外区域' || info.tag === info.name? info.tag : '地址'}</h4>`;
+			//var infoWindow = new BMapGL.InfoWindow(sContent);  // 创建信息窗口对象 
+			if (Mode == "createMap"){
+				mainWindow_js.storeInfo(1,info.name,info.addr);
+			}
+			if (Mode == "editMap"){
+				mainWindow_js.storeInfo(1,info.name,info.addr);
+			}
+			if (Mode == "continueAddMap" && continueAdd_name){
+				mainWindow_js.storeInfo(1,info.name,info.addr);
+				continueAdd_name = false;
+			}
+			//map.openInfoWindow(infoWindow, clickPoint); //开启信息窗口
+			// 移除插入的标签，防止越插入越多
+			document.getElementsByTagName('head')[0].removeChild(script);
+		}
+		else{
+			mainWindow_js.storeInfo(1,0,0);
+		}
+	}
+
+	var map = new BMapGL.Map("allmap", {enableIconClick: true});// 创建Map实例
+	map.centerAndZoom(new BMapGL.Point(113.3992,22.52236), 19);  // 初始化地图,设置中心点坐标和地图级别
+	map.enableScrollWheelZoom(true);     //开启鼠标滚轮缩放
+	// 定位
+	// 创建定位控件
+	var locationControl = new BMapGL.LocationControl({
+		// 控件的停靠位置（可选，默认左上角）
+		anchor: BMAP_ANCHOR_TOP_RIGHT,
+		// 控件基于停靠位置的偏移量（可选）
+		offset: new BMapGL.Size(50, 60)
+	});
+	// 将控件添加到地图上
+	map.addControl(locationControl);
+
+	/*
+	map.panTo(r.point);
+    */
+	//****添加缩放按钮
+	var scaleCtrl = new BMapGL.ScaleControl();  // 添加比例尺控件
+	map.addControl(scaleCtrl);
+	var zoomCtrl = new BMapGL.ZoomControl();  // 添加缩放控件
+    map.addControl(zoomCtrl);
+	//添加地图类型控件
+	map.addControl(new BMapGL.MapTypeControl({
+		mapTypes:[
+            BMAP_NORMAL_MAP,
+            BMAP_HYBRID_MAP
+        ]}));	  
+	//map.setCurrentCity("长沙");          // 设置地图显示的城市 此项是必须设置的
+	
+
+//**********************自定义函数     x=long , y=lat  ,BD09坐标系
+
+//添加点标注
+	function add_Point(x,y){ 
+		var pt = new BMapGL.Point(x, y);
+		var marker = new BMapGL.Marker(pt);  
+		map.addOverlay(marker);  
+		//map.clearOverlays();
+		// map.setCenter(data.points[0]);   
+		//map.removeOverlay(marker);               
+	}
+
+	/*****************QTODO****************/
+	function createMap(){
+		Mode = "createMap";
+	}
+
+	function editMap(){
+		Mode = "editMap";
+	}
+
+	function navigateMap(){
+		Mode = "navigationMap";
+	}
+
+	function continueAdd(){
+		Mode = "continueAddMap";
+		continueAdd_lon = true;
+		continueAdd_name = true;
+	}
+
+	function cancel(){
+		if (Mode == "createMap"){
+			points = [];
+			add_Polyline();
+		}
+		if (Mode == "editMap"){
+
+		}
+
+	}
+
+	/*************************************/
+
+	function add_Polyline(){
+		map.clearOverlays();
+		for(var i = 0; i < points.length; i++){
+			var marker = new BMapGL.Marker(points[i]);
+			var label = new BMapGL.Label(i+1,{offset:new BMapGL.Size(20,-10)});
+			marker.setLabel(label);		
+			map.addOverlay(marker);
+		}
+		polyline = new BMapGL.Polyline(points, {strokeColor:"blue", strokeWeight:2, strokeOpacity:0.5});
+		map.addOverlay(polyline);
+	}
+		
+	function clearPoints(){
+		points = [];
+	}
+	function storePoints(x,y){
+		points.push(new BMapGL.Point(x, y));
+	}
+
+	function visitPoint(x,y){
+		var currentPoint = new BMapGL.Point(x,y);
+		map.panTo(currentPoint);
+	}
+
+	function change_Polyline(index,x,y){
+		points[index-1] = new BMapGL.Point(x,y);
+		add_Polyline();
+	}
+
+	function delete_Point(index){
+		points.pop();
+		add_Polyline();
+	}
+	
+	//添加 三角箭头
+	function add_Vector(x,y){		
+		var vectorFCArrow = new BMapGL.Marker(new BMapGL.Point(x,y), {		
+		icon: new BMapGL.Symbol(BMap_Symbol_SHAPE_FORWARD_CLOSED_ARROW, {// 初始化方向向上的闭合箭头
+			scale: 5,
+			strokeWeight: 1,
+			rotation: 0,//顺时针旋转30度
+			fillColor: 'red',
+			fillOpacity: 0.8
+		})
+		});
+		map.addOverlay(vectorFCArrow);
+		vectorFCArrow.show();
+		//vectorFCArrow.hide()
+	}
+	function showAlert() {
+        alert('this is web alert');
+  }
+
+//************* long, lat GPS坐标  这里经过了GPS转BD09的过程
+	function addmarker(x,y){ 
+		translateCallback = function (data){
+			if(data.status === 0) {
+				var pt = new BMapGL.Point(x, y);
+				var marker = new BMapGL.Marker(pt);  // 创建标注	
+				var label = new BMapGL.Label(x+","+y+",",{offset:new BMapGL.Size(20,-10)});
+				marker.setLabel(label);			
+				map.addOverlay(marker);  
+		} }
+		setTimeout(function(){  //GPS转百度坐标
+			var convertor = new BMapGL.Convertor();
+			var pointArr = [];
+			pointArr.push(new BMapGL.Point(x,y));
+			convertor.translate(pointArr, 1, 5, translateCallback)   //;
+		}, 100);  
+	}
+	// QT交互********************************************* 
+	/*
+	new QWebChannel(qt.webChannelTransport, function(channel) {
+		window.bridge_js = channel.objects.bridge_name;  //bridge_name 与QT 中一致
+	 	window.bridge_js.sigYourName.connect(function(name) {});
+		window.mainWindow_js = channel.objects.mainWindow;  //bridge_name 与QT 中一致
+		window.mainWindow_js.sigYourName.connect(function(name) {});
+   });
+   */
+   
+	map.addEventListener("click", function (e) {
+		if (Mode == "createMap") {
+			points.push(new BMapGL.Point(e.latlng.lng, e.latlng.lat)); // 存储地点,只有在创建地图时能够执行
+			mainWindow_js.storeInfo(0,e.latlng.lng, e.latlng.lat);
+			add_Polyline(e.point.lng, e.point.lat);
+		}
+		else if (Mode == "editMap") {
+			mainWindow_js.storeInfo(0,e.latlng.lng, e.latlng.lat);
+		}
+		else if (Mode == "continueAddMap" && continueAdd_lon){
+			points.push(new BMapGL.Point(e.latlng.lng, e.latlng.lat)); // 存储地点,只有在创建地图时能够执行
+			mainWindow_js.storeInfo(0,e.latlng.lng, e.latlng.lat);
+			add_Polyline(e.point.lng, e.point.lat);
+			continueAdd_lon = false;
+		} 
+		else if (Mode == "navigationMap") {
+			//mainWindow_js.storeInfo(0,e.latlng.lng, e.latlng.lat);
+		}
+	});
+
+	map.addEventListener('click', e => {
+		
+		clickPoint = e.latlng;
+		const point = e.point;
+		const itemId = map.getIconByClickPosition(e);
+		if (Mode == "createMap") {
+			if (itemId) {
+				let url = "https://api.map.baidu.com/?qt=inf&uid="+itemId.uid+'&operate=mapclick&clicktype=tile&ie=utf-8&oue=1&fromproduct=jsapi&res=api&&ak=bhfegcdfczbj2FDgdsMnThNH47XTXZqx&callback=sucess'
+				script = document.createElement('script');
+				script.setAttribute('src', url);
+				document.getElementsByTagName('head')[0].appendChild(script);
+			}
+			else{
+				mainWindow_js.storeInfo(1,0,0);
+			}
+		}
+		else if (Mode == "editMap") {
+			if (itemId) {
+				let url = "https://api.map.baidu.com/?qt=inf&uid="+itemId.uid+'&operate=mapclick&clicktype=tile&ie=utf-8&oue=1&fromproduct=jsapi&res=api&&ak=bhfegcdfczbj2FDgdsMnThNH47XTXZqx&callback=sucess'
+				script = document.createElement('script');
+				script.setAttribute('src', url);
+				document.getElementsByTagName('head')[0].appendChild(script);
+			}
+			else{
+				mainWindow_js.storeInfo(1,0,0);
+			}
+		}
+		else if (Mode == "continueAddMap" && continueAdd_name){
+			if (itemId) {
+				let url = "https://api.map.baidu.com/?qt=inf&uid="+itemId.uid+'&operate=mapclick&clicktype=tile&ie=utf-8&oue=1&fromproduct=jsapi&res=api&&ak=bhfegcdfczbj2FDgdsMnThNH47XTXZqx&callback=sucess'
+				script = document.createElement('script');
+				script.setAttribute('src', url);
+				document.getElementsByTagName('head')[0].appendChild(script);
+			}
+			else{
+				mainWindow_js.storeInfo(1,0,0);
+				continueAdd_name = false;
+			} 
+		}
+		else if (Mode == "navigationMap") {
+		}
+	});
+
+
+
+	
+//********************************************* end
+
+// 测试 ，添加示例标注  图片+ 标点   GPS坐标
+	/*
+		translateCallback = function (data){
+			if(data.status === 0) {
+				add_Point(data.points[0].lng,data.points[0].lat);
+				map.setCenter(data.points[0]);
+			} // 
+   		}
+		setTimeout(function(){  //GPS转百度坐标
+			var convertor = new BMap.Convertor();
+			var pointArr = [];
+			pointArr.push(new BMap.Point(112.942409,28.164751));   
+			convertor.translate(pointArr, 1, 5, translateCallback)
+		}, 100);   //end  */
+//测试， BD09坐标 ，未转换。
+	//add_Ico(112.942409,28.164751);
+	//add_Point(112.942409,28.164751);
+	//add_Vector(112.942409,28.164751);
+	
+</script>
+<!--
+
+-->

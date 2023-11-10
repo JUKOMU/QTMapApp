@@ -1,0 +1,13 @@
+<RCC>
+    <qresource prefix="/new/prefix1">
+        <file>baidumap.html</file>
+        <file>qwebchannel.js</file>
+        <file>airplane48.ico</file>
+        <file>shiratamaco(3).png</file>
+        <file>shiratamaco(4).png</file>
+        <file>1689245212966.jpg</file>
+        <file>logo.png</file>
+        <file>searchlogo.png</file>
+        <file>searchlogo_nothover.png</file>
+    </qresource>
+</RCC>
